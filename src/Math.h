@@ -1,7 +1,29 @@
 #ifndef MATH_H
 #define MATH_H
 #include <cmath>
+#include <limits>
+#include <random>
 #include <array>
+
+inline int randomize(int min, int max) {
+    // 'static' ensures these are initialized only once
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    
+    std::uniform_int_distribution<int> distrib(min, max);
+    return distrib(gen);
+}
+
+inline float clamp(float val, float min, float max)
+{
+    return std::fmax(min, std::fmin(val, max));
+}
+
+template <typename T>
+bool isNearZero(T value, T epsilon = std::numeric_limits<T>::epsilon()) 
+{
+    return std::abs(value) < epsilon;
+}
 struct Vec3
 {
     float x,y,z;
@@ -34,6 +56,74 @@ struct Vec3
         return Vec3(x / scalar , y / scalar , z / scalar);
     };
 
+    static float randomFloat() {
+        static std::uniform_real_distribution<float> distribution(0.0, 1.0);
+        static std::mt19937 generator;
+        return distribution(generator);
+    }
+
+    static float randomFloat(float min, float max) {
+        return min + (max-min)*randomFloat();
+    }
+
+    static Vec3 random()
+    {
+        return Vec3(randomFloat(), randomFloat(), randomFloat());
+    }
+
+    static Vec3 random(float min, float max)
+    {
+        return Vec3(randomFloat(min, max), randomFloat(min, max), randomFloat(min, max));
+    }
+
+    static Vec3 randomInUnitSphere()
+    {
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+        static std::uniform_real_distribution<float> distrib(-1.0f, 1.0f);
+
+        Vec3 point;
+        do
+        {
+            point = Vec3(distrib(gen), distrib(gen), distrib(gen));
+        } while (point.dot(point) >= 1.0f);
+
+        return point;
+    }
+
+    static Vec3 randomUnitVector()
+    {
+        return randomInUnitSphere().normalize();
+    }
+
+    Vec3 reflect(Vec3 normal)
+    {
+        float projection = 2.0f * dot(normal);
+        return Vec3(x - projection * normal.x,
+                    y - projection * normal.y,
+                    z - projection * normal.z);
+    }
+
+    Vec3 refract(Vec3 normal, float eta)
+    {
+        Vec3 unit = normalize();
+        Vec3 opposite = Vec3(-unit.x, -unit.y, -unit.z);
+        float cosTheta = std::fmin(opposite.dot(normal), 1.0f);
+        Vec3 perpendicular = (unit + normal * cosTheta) * eta;
+        float parallelLength = std::sqrt(std::fabs(1.0f - perpendicular.dot(perpendicular)));
+        Vec3 parallel = normal * -parallelLength;
+
+        return perpendicular + parallel;
+    }
+
+    bool nearZero()
+    {
+        const float epsilon = 1e-8f;
+        return std::fabs(x) < epsilon &&
+               std::fabs(y) < epsilon &&
+               std::fabs(z) < epsilon;
+    }
+
     float dot(Vec3 other)
     {
     return x * other.x + y * other.y + z * other.z;
@@ -59,7 +149,7 @@ struct Vec3
         }
         return *this;
     }
-    };
+};
 
 
 struct Vec4
@@ -240,7 +330,6 @@ struct Mat4
         return result;
     }
 };
-#endif // MATH_H
 // Extensions for ray tracing
 inline Vec3 operator*(float t, const Vec3& v) {
     return Vec3(v.x * t, v.y * t, v.z * t);
@@ -255,3 +344,4 @@ inline Vec3 cross(const Vec3& u, const Vec3& v) {
                 u.z * v.x - u.x * v.z,
                 u.x * v.y - u.y * v.x);
 }
+#endif // MATH_H
