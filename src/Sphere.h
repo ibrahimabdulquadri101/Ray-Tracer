@@ -1,19 +1,4 @@
-#pragma once
-#include "Hittable.h"
-#include "Math.h"
-#include <memory>
+#ifndef SPHERE_H
+#define SPHERE_H
 
-class Material;
-
-class Sphere : public Hittable {
-public:
-    Sphere();
-    Sphere(Vec3 center, float radius, std::shared_ptr<Material> m);
-    
-    virtual bool hit(const Ray& r, float t_min, float t_max, HitRecord& rec) const override;
-
-private:
-    Vec3 center;
-    float radius;
-    std::shared_ptr<Material> mat;
-};
+#endif // SPHERE_H

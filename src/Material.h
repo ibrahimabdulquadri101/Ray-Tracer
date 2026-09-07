@@ -1,10 +1,4 @@
-#pragma once
-#include "Math.h"
-#include "Ray.h"
-#include "HitRecord.h"
+#ifndef MATERIAL_H
+#define MATERIAL_H
 
-class Material {
-public:
-    virtual ~Material() = default;
-    virtual bool scatter(const Ray& r_in, const HitRecord& rec, Vec3& attenuation, Ray& scattered) const = 0;
-};
+#endif // MATERIAL_H

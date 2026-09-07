@@ -1,16 +1,4 @@
-#pragma once
-#include "Camera.h"
-#include "HittableList.h"
-#include "Image.h"
+#ifndef RENDERER_H
+#define RENDERER_H
 
-class Renderer {
-public:
-    Renderer(int width, int height);
-    
-    void render(const Camera& cam, const HittableList& world, Image& image);
-
-private:
-    int width;
-    int height;
-    Vec3 ray_color(const Ray& r, const Hittable& world, int depth);
-};
+#endif // RENDERER_H
