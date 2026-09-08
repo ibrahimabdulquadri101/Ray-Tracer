@@ -24,10 +24,10 @@ struct Vec3
     Vec3(float x , float y , float z);
     Vec3();
 
-    Vec3 operator+(Vec3 other);
-    Vec3 operator-(Vec3 other);
-    Vec3 operator*(float scalar);
-    Vec3 operator/(float scalar);
+    Vec3 operator+(Vec3 other) const;
+    Vec3 operator-(Vec3 other) const;
+    Vec3 operator*(float scalar) const;
+    Vec3 operator/(float scalar) const;
 
     static float randomFloat() {
         static std::uniform_real_distribution<float> distribution(0.0, 1.0);
@@ -69,7 +69,7 @@ struct Vec3
         return randomInUnitSphere().normalize();
     }
 
-    Vec3 reflect(Vec3 normal)
+    Vec3 reflect(Vec3 normal) const
     {
         float projection = 2.0f * dot(normal);
         return Vec3(x - projection * normal.x,
@@ -77,7 +77,7 @@ struct Vec3
                     z - projection * normal.z);
     }
 
-    Vec3 refract(Vec3 normal, float eta)
+    Vec3 refract(Vec3 normal, float eta) const
     {
         Vec3 unit = normalize();
         Vec3 opposite = Vec3(-unit.x, -unit.y, -unit.z);
@@ -89,7 +89,7 @@ struct Vec3
         return perpendicular + parallel;
     }
 
-    bool nearZero()
+    bool nearZero() const
     {
         const float epsilon = 1e-8f;
         return std::fabs(x) < epsilon &&
@@ -97,10 +97,10 @@ struct Vec3
                std::fabs(z) < epsilon;
     }
 
-    float dot(Vec3 other);
-    Vec3 cross(Vec3 other);
-    float length();
-    Vec3 normalize();
+    float dot(Vec3 other) const;
+    Vec3 cross(Vec3 other) const;
+    float length() const;
+    Vec3 normalize() const;
 };
 
 struct Vec4
