@@ -20,14 +20,15 @@ bool isNearZero(T value, T epsilon = std::numeric_limits<T>::epsilon())
 
 struct Vec3
 {
-    float x,y,z;
-    Vec3(float x , float y , float z);
-    Vec3();
+    float x, y, z;
 
-    Vec3 operator+(Vec3 other) const;
-    Vec3 operator-(Vec3 other) const;
-    Vec3 operator*(float scalar) const;
-    Vec3 operator/(float scalar) const;
+    Vec3() : x(0.0f), y(0.0f), z(0.0f) {}
+    Vec3(float x, float y, float z) : x(x), y(y), z(z) {}
+
+    Vec3 operator+(Vec3 other) const { return Vec3(x + other.x, y + other.y, z + other.z); }
+    Vec3 operator-(Vec3 other) const { return Vec3(x - other.x, y - other.y, z - other.z); }
+    Vec3 operator*(float s)    const { return Vec3(x * s, y * s, z * s); }
+    Vec3 operator/(float s)    const { return Vec3(x / s, y / s, z / s); }
 
     static float randomFloat() {
         static std::uniform_real_distribution<float> distribution(0.0, 1.0);
@@ -97,10 +98,17 @@ struct Vec3
                std::fabs(z) < epsilon;
     }
 
-    float dot(Vec3 other) const;
-    Vec3 cross(Vec3 other) const;
-    float length() const;
-    Vec3 normalize() const;
+    float dot(Vec3 other) const { return x*other.x + y*other.y + z*other.z; }
+    Vec3  cross(Vec3 other) const {
+        return Vec3(y*other.z - z*other.y,
+                    z*other.x - x*other.z,
+                    x*other.y - y*other.x);
+    }
+    float length() const { return std::sqrt(x*x + y*y + z*z); }
+    Vec3  normalize() const {
+        float len = length();
+        return len > 0.0f ? *this / len : *this;
+    }
 };
 
 struct Vec4

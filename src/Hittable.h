@@ -21,7 +21,7 @@ public:
 
     // Returns the axis-aligned bounding box of this object over time [t0, t1].
     // Required by the BVH to build the acceleration structure.
-    virtual bool boundingBox(float t0, float t1, AABB& box) const = 0;
+    virtual bool boundingBox(float t0, float t1, AABB& box) const { return false; }
 };
 
 #endif // HITTABLE_H
