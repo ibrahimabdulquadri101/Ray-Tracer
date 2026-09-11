@@ -1,166 +1,101 @@
-# CPU Path Tracer
+# Ray Tracer
 
-A from-scratch C++17 path tracer. It shoots camera rays into a scene of spheres (and optional triangles), bounces them according to physically based materials, and shows the image in a GLFW window while it converges.
+A physically-based, CPU-bound ray tracer written in modern C++ (C++17). It simulates light transport to produce highly realistic images featuring global illumination, soft shadows, caustics, depth of field, and true reflection/refraction. 
 
-This is an educational renderer, not a production engine. The code is small on purpose: one idea per file, so you can read the pipeline top to bottom.
+Instead of waiting for a final image to render to disk, the project uses a vendored GLFW + OpenGL setup to display a progressive, live-updating window. You can watch the ray tracer resolve the image row-by-row in real-time.
 
-## What it does
+## Features & Implementation Details
 
-- Unbiased-style **path tracing** with cosine-weighted Lambertian scatter, mirror/fuzzy metal, and dielectric refraction (Snell + Schlick)
-- **Emissive surfaces** (`DiffuseLight`) so rooms can be lit by geometry instead of a fake directional light
-- A **BVH** over object AABBs so hundreds of random spheres stay interactive to trace
-- A thin-lens **camera** (aperture + focus distance) for depth of field
-- **Scanline multithreading** across `std::thread::hardware_concurrency()` cores
-- A live **OpenGL texture** so you watch rows fill in instead of staring at a blank terminal
-- **ACES filmic tone mapping** and gamma 2.2 so HDR samples look like a photograph, not a clipped PNG
-
-## How a pixel is made
-
-```
-Camera ray  →  BVH hit  →  material scatter or emit  →  recurse
-     ↑                                                    │
-     └──────── average many samples, tone-map, display ───┘
-```
-
-1. For each pixel, the renderer fires `N` rays with a random offset inside the pixel (**jittered sampling**). That antialiases edges and averages noise.
-2. `scene.hit` walks the BVH and returns the nearest intersection (`HitRecord`: point, normal, `t`, material).
-3. The hit material either **emits** light, **scatters** a new ray (with an RGB attenuation), or both.
-4. Recursion continues until `maxDepth` or **Russian roulette** kills a dim path.
-5. Misses return an environment color (day sky, night sky, or black).
-6. Samples are averaged, clamped, tone-mapped, and uploaded to the window.
-
-`Renderer::rayColor` in `src/Renderer.cpp` is the whole integrator. Start there if you want to understand lighting.
-
-## Why certain choices exist
-
-These are the decisions that look arbitrary until you hit the bug they prevent.
-
-| Choice | Why it is there |
+| Feature | Implementation Notes |
 | --- | --- |
-| `tMin = 0.001` on bounce rays | After a hit, the origin sits on the surface. A `tMin` of 0 re-intersects the same face (shadow acne / black speckles). |
-| Jittered `u,v` per sample | One ray through the pixel center aliases every edge. Random subpixel offsets turn aliasing into noise, which averages out. |
-| Many samples per pixel | Path tracing is a Monte Carlo estimate. Noise is variance. More samples = cleaner image. Indoor GI needs more than a sky-lit field. |
-| Per-sample radiance clamp (`8.0`) | A bounce that luckily hits a tiny bright light or the sun disc produces a firefly. Clamping is slightly biased but stops white sparkles. |
-| Soft sky sun (wide disc, moderate energy) | A mathematically tiny sun is almost never sampled, then blows the pixel when it is. A wider, dimmer sun is stabler. |
-| Environment modes (day / night / indoor black) | A Cornell box or metal dome should not leak a blue daytime sky through every miss. Indoor scenes use black; night uses a dark gradient. |
-| `DiffuseLight` instead of shiny metal for lamps | Metal only reflects. If nothing in the scene **emits**, every path dies at black and the image is empty. “Bright metal” is not a light. |
-| Russian roulette after a few bounces | Deep paths contribute almost nothing but cost full recursion. Randomly killing them (and weighting survivors by `1/p`) keeps the estimator honest while cutting work. |
-| ACES + gamma 2.2 | Linear HDR averages are physically right but look washed or clipped on an sRGB display. Filmic mapping keeps highlights, gamma matches monitors. |
-| `thread_local` RNGs in `Vec3` | One global `rand` from many threads races and correlates noise. Each worker has its own generator. |
-| Materials stored in a `shared_ptr` vector | Spheres hold a raw `Material*`. The vector owns the memory for the whole render so those pointers stay valid. |
-| Negative sphere radius | `outwardNormal = (point - center) / radius`. A negative radius flips the normal, which is how a hollow glass shell is built (outer `+1`, inner `-0.95`). |
-| `abs(radius)` in the sphere AABB | A negative radius would invert `min`/`max` and break the BVH. The box always uses the geometric size. |
-| BVH over a linear list | Scene 1 has ~80 small spheres. Naive `O(n)` hits per ray are fine for five objects and painful for hundreds. |
-| Live GLFW preview, not a PPM write | You can tell in seconds if the camera or materials are wrong. Closing the window currently only stops the UI wait; worker threads still finish the frame. |
-| GLFW vendored in `third_party/` | Clone and build without hunting a system package. Docs/tests/examples are turned off in CMake to keep the configure step short. |
-| Scanline threading (not per-pixel) | Whole rows share cache-friendly loops and need only one atomic counter for the progress bar / texture upload. |
+| **BVH (Bounding Volume Hierarchy)** | Accelerates ray-object intersection from $O(n)$ to $O(\log n)$. Essential for complex scenes. |
+| **Live Progressive Preview** | Uses a lightweight GLFW/OpenGL context to blit completed scanlines to a texture. You see results immediately. |
+| **Multi-threading** | Work is split by scanlines across available CPU cores using `std::thread`. A lock-free atomic counter tracks progress. |
+| **Anti-Aliasing** | Jittered sub-pixel sampling prevents jagged edges and averages out Monte Carlo noise. |
+| **Russian Roulette** | Unbiased path termination. Randomly kills deep, low-contribution rays to save computation without darkening the image. |
+| **Physically-Based Camera** | Supports adjustable field of view, defocus blur (depth of field) via a thin-lens approximation, and focal distance. |
+| **HDR Tone Mapping** | Uses the ACES filmic tone mapping curve with 2.2 gamma correction to gracefully handle overexposed highlights without clipping. |
+| **Thread-Local RNG** | Each worker thread maintains its own independent `std::mt19937` random number generator to prevent lock contention and correlation artifacts. |
+| **Atmospheric Sky Model** | Provides a dynamic zenith-to-horizon gradient with a sun disc and warm ground glow for outdoor scenes. |
 
-## Repository layout
+## Supported Materials
+
+The material system uses polymorphism (`Material` base class) to handle different scattering behaviors seamlessly.
+
+*   **Lambertian (Diffuse):** Matte surfaces. Scatters rays in random cosine-weighted directions.
+*   **Metal (Conductor):** Reflective surfaces. Features a `fuzz` parameter to simulate microscopic roughness (from perfect mirrors to brushed aluminum).
+*   **Dielectric (Insulator):** Glass, water, and diamonds. Implements Snell's Law for refraction, total internal reflection, and Schlick's approximation for angle-dependent reflectivity (Fresnel effect).
+*   **DiffuseLight (Emissive):** Light sources. Emits radiance instead of scattering incoming rays. Essential for indoor scenes, soft shadows, and global illumination.
+
+## Project Structure
 
 ```
-src/                 tracer, camera, materials, window
-third_party/glfw/    windowing + OpenGL context
-CMakeLists.txt       C++17 executable `RayTracer`
+.
+├── CMakeLists.txt         # Build configuration
+├── src/                   # C++ headers and source files
+└── third_party/glfw/      # Vendored GLFW library (no system install needed)
 ```
 
-### `src/` map
+### Core Architecture
 
-| File | Role |
-| --- | --- |
-| `main.cpp` | Scene graph, camera, sample/depth/environment per scene, window loop |
-| `Renderer.cpp` | Integrator, threading, tone map, sky |
-| `Camera.cpp` | Thin lens: origin on the aperture disk, rays through the focus plane |
-| `Ray.h` | `P(t) = origin + t * direction` |
-| `Math.h` | `Vec3`, random hemisphere/sphere, reflect, refract |
-| `Hittable.h` | Hit + bounding-box interface |
-| `HitRecord.h` | Intersection payload; `setFaceNormal` so dielectrics know inside vs outside |
-| `HittableList.cpp` | List of objects; also used as the scene root that holds one BVH |
-| `Sphere.cpp` | Analytic sphere; negative radius flips normals |
-| `Triangle.cpp` | Möller–Trumbore triangles (used for flat walls if you add quads) |
-| `AABB.h` / `BVH.cpp` | Axis-aligned boxes and a binary volume hierarchy |
-| `Material.h` | Lambertian, Metal, Dielectric, DiffuseLight |
-| `Image.cpp` | Float RGB buffer (PPM save still exists on the class, unused by `main`) |
-| `Window.cpp` | GLFW window + `GL_TEXTURE_2D` blit of completed rows |
+1.  `Ray.h` / `Math.h`: The mathematical foundation (Vectors, Matrices, Parametric Rays).
+2.  `Hittable.h` / `HittableList.h`: The geometry interface and scene graph.
+3.  `Sphere.cpp`: Analytic sphere intersections. (Negative radii elegantly handle hollow glass by flipping normals).
+4.  `BVH.cpp`: Axis-Aligned Bounding Boxes and the spatial acceleration tree.
+5.  `Material.h`: The BSDF implementations governing light-surface interactions.
+6.  `Camera.cpp`: Generates the primary rays for each pixel.
+7.  `Renderer.cpp`: The main integrator. Handles the recursive ray-color logic, multi-threading, and tone mapping.
+8.  `Window.cpp`: The GLFW display wrapper.
+9.  `main.cpp`: Scene definitions and the execution entry point.
 
-Read in that order if you are new: `Ray` → `Sphere::hit` → `Material::scatter` → `Renderer::rayColor` → `main` scenes.
+## Building the Project
 
-## Build
-
-Needs CMake 3.10+, a C++17 compiler, and OpenGL. GLFW is already in the tree.
+The project requires CMake (3.10+), a C++17 compliant compiler, and standard system OpenGL libraries. GLFW is included directly in the repository.
 
 ```bash
+# Configure the build in Release mode (critical for performance)
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+# Compile the executable
 cmake --build build -j
 ```
 
-On macOS the OpenGL headers may warn that the API is deprecated. That is the system SDK, not a logic error.
+*Note for macOS users: You may see deprecation warnings regarding the OpenGL headers. This is standard for Apple's legacy OpenGL framework and does not affect the program.*
 
-## Run
+## Running the Ray Tracer
+
+The executable takes a single integer argument (1-5) to select the scene. 
 
 ```bash
-./build/RayTracer      # scene 1
-./build/RayTracer 2    # scene 2 … 5
+cd build
+./RayTracer 1    # Cornell Box
+./RayTracer 2    # Solar System
+./RayTracer 3    # Hall of Mirrors
+./RayTracer 4    # Underwater
+./RayTracer 5    # Night Sky
 ```
 
-Default resolution is **800×450**. Sample count and max depth are per scene (see below). Leave the window open until the progress line hits 100%.
+By default, the renderer runs at **800×450**. The sample count and maximum bounce depth are tuned per scene. Let the window remain open until the terminal reports 100% completion. The final image is automatically saved to `output/render_scene_<id>.ppm`.
 
-Renders are not written to disk. If you want a file, call `image.savePPM(...)` after `renderer.render` in `main.cpp`.
+### Scene Descriptions
 
-## Scenes
+*   **Scene 1: Cornell Box**
+    The classic ray tracing benchmark. Tests color bleeding (radiosity) from colored walls onto neutral objects, soft shadows from an area light, and enclosed global illumination.
+*   **Scene 2: Solar System**
+    Features a bright emissive sun at the origin surrounded by a rocky planet (Lambertian), a gas giant (Metal), and an icy moon (Dielectric).
+*   **Scene 3: Hall of Mirrors**
+    A corridor constructed from perfect mirrors. Tests the maximum recursion depth limit and showcases infinite recursive reflections.
+*   **Scene 4: Underwater**
+    A massive dielectric sphere representing water, acting as a giant lens that envelops and refracts objects placed inside it.
+*   **Scene 5: Night Sky**
+    A dark environment illuminated by hundreds of tiny emissive star spheres and a single large moon sphere, demonstrating handling of many distinct light sources.
 
-All of these are built in `buildScene` in `src/main.cpp`.
+## Performance Expectations
 
-### 1 — Classic sphere field (100 spp, depth 50)
+Ray tracing performance is bounded by `width × height × samples × average bounces`. 
+Geometry intersection is heavily optimized by the BVH, making material complexity (e.g., highly recursive glass or mirrors) the primary bottleneck.
 
-Large grey ground, glass center, matte blue left, gold metal right, ~80 random mini spheres. Camera `(13, 2, 3)` looking at the origin, fov 20, aperture `0.1`, focus `10`. Daylight sky is the light source. This is the “cover image” stress test: DoF, mixed materials, BVH.
+*   **Indoor / Emissive Scenes (Scenes 1, 5):** Require more samples to resolve noise from indirect lighting.
+*   **Mirror / Glass Scenes (Scenes 3, 4):** Require higher bounce depths, keeping rays alive longer.
 
-### 2 — Cornell box (200 spp, depth 50)
-
-Red / green / white walls made from huge spheres, a small **emissive** ceiling light, a white sphere and a glass sphere on the floor. The front is open to the sky. 200 samples because enclosed bounce lighting is noisy. Objects sit on the floor (`y = radius`); burying them under `y = 0` would hide them inside the ground sphere.
-
-### 3 — Night ring (150 spp, depth 50)
-
-Dark ground, glowing gold center (`DiffuseLight`), eight orbiting glass/color spheres, a giant dark-blue metal sky shell. Environment is **black** so misses do not become daylight. The gold sphere has to emit: a metal ball in a closed metal shell with no lights is a black image.
-
-### 4 — Hollow glass (200 spp, depth 50)
-
-Dielectric radius `1.0` plus an inner dielectric radius `-0.95` (normal flip). That is a glass bubble, not a solid ball. Green ground, blue matte, fuzzy gold, small chrome floater. Sky-lit.
-
-### 5 — Hall of mirrors (300 spp, depth 100)
-
-Metal floor/ceiling and perfect silver side walls, red diffuse center, small glass and gold companions. Depth is 100 so mirror chains can run a long time before they are cut. Open ends still see the day sky, which is what lights the corridor.
-
-## Materials (short)
-
-- **Lambertian** — random bounce biased by the normal. Matte paint. `albedo` is the surface color.
-- **Metal** — reflect about the normal; `fuzz` perturbs the direction (`0` = mirror).
-- **Dielectric** — refract or reflect (total internal reflection + Schlick). Index `1.5` is glass, `1.33` is water. Attenuation is white (no absorption).
-- **DiffuseLight** — `scatter` returns false; `emitted()` is the radiance. This is the only material that injects energy.
-
-## Performance expectations
-
-Path tracing cost is roughly `width × height × samples × average bounces`. Geometry is cheap until you have thousands of primitives; **samples and glass/mirrors** dominate.
-
-Ballpark on a modern laptop, 800×450:
-
-- Scene 1 (~100 spp): a couple of minutes
-- Scene 2 / 4 (200 spp, GI or glass): longer
-- Scene 5 (300 spp, depth 100): the slowest — every wall is a mirror
-
-Use `Release`. Debug builds will feel an order of magnitude slower.
-
-## Extending it
-
-Useful next steps, in roughly increasing difficulty:
-
-1. Raise samples / resolution in `main`.
-2. Add a quad helper (`two triangles`) for a real Cornell box instead of giant spheres.
-3. Next-event estimation (explicit light sampling) to kill indoor noise without 1000 spp.
-4. Bounding boxes for every new shape; the BVH constructor prints if one is missing.
-5. Importance-sampled GGX if you want roughness that is not “metal fuzz.”
-
-Keep new shapes behind `Hittable` and new BRDFs behind `Material::scatter`. The renderer should not special-case object types.
-
-## Credits
-
-The structure follows Peter Shirley’s *Ray Tracing in One Weekend* series (rays, spheres, materials, BVH, Cornell-style lighting). GLFW is used only for the window and GL context.
+**Always build in `Release` mode.** Debug builds will run exponentially slower due to the lack of compiler optimizations for vector math and recursive functions.
