@@ -28,11 +28,13 @@ struct Vec3
     Vec3 operator+(Vec3 other) const { return Vec3(x + other.x, y + other.y, z + other.z); }
     Vec3 operator-(Vec3 other) const { return Vec3(x - other.x, y - other.y, z - other.z); }
     Vec3 operator*(float s)    const { return Vec3(x * s, y * s, z * s); }
+    Vec3 operator*(Vec3 other) const { return Vec3(x * other.x, y * other.y, z * other.z); }
     Vec3 operator/(float s)    const { return Vec3(x / s, y / s, z / s); }
+    Vec3 operator/(Vec3 other) const { return Vec3(x / other.x, y / other.y, z / other.z); }
 
     static float randomFloat() {
-        static std::uniform_real_distribution<float> distribution(0.0, 1.0);
-        static std::mt19937 generator;
+        static thread_local std::mt19937 generator(std::random_device{}());
+        static thread_local std::uniform_real_distribution<float> distribution(0.0, 1.0);
         return distribution(generator);
     }
 
@@ -52,9 +54,8 @@ struct Vec3
 
     static Vec3 randomInUnitSphere()
     {
-        static std::random_device rd;
-        static std::mt19937 gen(rd());
-        static std::uniform_real_distribution<float> distrib(-1.0f, 1.0f);
+        static thread_local std::mt19937 gen(std::random_device{}());
+        static thread_local std::uniform_real_distribution<float> distrib(-1.0f, 1.0f);
 
         Vec3 point;
         do

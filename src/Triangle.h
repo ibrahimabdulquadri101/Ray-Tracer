@@ -21,6 +21,7 @@ class Triangle : public Hittable
         }
 
         virtual bool hit(const Ray& ray, float tMin, float tMax, HitRecord& rec) const override;
+        virtual bool boundingBox(float t0, float t1, AABB& box) const override;
 };
 
 #endif // TRIANGLE_H

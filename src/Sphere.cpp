@@ -36,7 +36,8 @@ bool Sphere::hit(const Ray& ray, float tMin, float tMax, HitRecord& rec) const
 
 bool Sphere::boundingBox(float t0, float t1, AABB& box) const
 {
-    box = AABB(center - Vec3(radius, radius, radius),
-               center + Vec3(radius, radius, radius));
+    float r = std::fabs(radius);
+    box = AABB(center - Vec3(r, r, r),
+               center + Vec3(r, r, r));
     return true;
 }

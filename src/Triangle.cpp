@@ -1,5 +1,5 @@
 #include "Triangle.h"
-#include <iostream>
+#include <cmath>
 
 bool Triangle::hit(const Ray& ray, float tMin, float tMax, HitRecord& rec) const
 {
@@ -43,5 +43,20 @@ bool Triangle::hit(const Ray& ray, float tMin, float tMax, HitRecord& rec) const
     rec.setFaceNormal(ray, normal);
     rec.material = material;
 
+    return true;
+}
+
+bool Triangle::boundingBox(float t0, float t1, AABB& box) const
+{
+    (void)t0;
+    (void)t1;
+    Vec3 small(std::fmin(v0.x, std::fmin(v1.x, v2.x)),
+               std::fmin(v0.y, std::fmin(v1.y, v2.y)),
+               std::fmin(v0.z, std::fmin(v1.z, v2.z)));
+    Vec3 big(std::fmax(v0.x, std::fmax(v1.x, v2.x)),
+             std::fmax(v0.y, std::fmax(v1.y, v2.y)),
+             std::fmax(v0.z, std::fmax(v1.z, v2.z)));
+    const float pad = 0.0001f;
+    box = AABB(small - Vec3(pad, pad, pad), big + Vec3(pad, pad, pad));
     return true;
 }

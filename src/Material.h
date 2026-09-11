@@ -20,6 +20,9 @@ public:
     // Ray& scattered      — OUTPUT: the new ray that leaves the surface
     // returns true if a new ray was produced, false if the ray is swallowed
     virtual bool scatter(const Ray& rayIn, const HitRecord& rec, Vec3& attenuation, Ray& scattered) const = 0;
+
+    // Non-emissive materials return black — only DiffuseLight overrides this
+    virtual Vec3 emitted() const { return Vec3(0.0f, 0.0f, 0.0f); }
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -148,6 +151,27 @@ public:
         // The new ray starts at the hit point and travels in the chosen direction
         scattered = Ray(rec.point, direction);
         return true; // glass always produces an outgoing ray
+    }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DiffuseLight — emissive surface / light source
+// Scatters nothing (all rays are swallowed), but emits a constant color/radiance.
+// These are the actual light sources: when a traced ray lands on one, its energy
+// is added to the path, which gives realistic soft shadows + global illumination.
+// ─────────────────────────────────────────────────────────────────────────────
+class DiffuseLight : public Material {
+public:
+    Vec3  emit;    // radiance (color * intensity), typically >1 for bright light
+
+    DiffuseLight(const Vec3& e) : emit(e) {}
+
+    virtual bool scatter(const Ray& rayIn, const HitRecord& rec, Vec3& attenuation, Ray& scattered) const override {
+        return false; // light surfaces don't bounce rays — they only emit
+    }
+
+    virtual Vec3 emitted() const override {
+        return emit;
     }
 };
 
