@@ -1,4 +1,5 @@
 #include "HittableList.h"
+#include "BVH.h"
 #include <vector>
 
 void HittableList::add(std::shared_ptr<Hittable> object)
@@ -26,4 +27,18 @@ bool HittableList::hit(const Ray& ray, float tMin, float tMax, HitRecord& rec) c
         }
     }
     return hitAnything;
+}
+
+bool HittableList::boundingBox(float t0, float t1, AABB& box) const
+{
+    if (objects.empty()) return false;
+
+    AABB tempBox;
+    bool firstBox = true;
+    for (const auto& object : objects) {
+        if (!object->boundingBox(t0, t1, tempBox)) return false;
+        box = firstBox ? tempBox : surroundingBox(box, tempBox);
+        firstBox = false;
+    }
+    return true;
 }

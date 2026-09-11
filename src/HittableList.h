@@ -12,6 +12,8 @@ class HittableList : public Hittable
         void add(std::shared_ptr<Hittable> object);
         void clear();
         bool hit(const Ray& ray, float tMin, float tMax, HitRecord& rec) const override;
+        bool boundingBox(float t0, float t1, AABB& box) const override;
+        const std::vector<std::shared_ptr<Hittable>>& getObjects() const { return objects; }
 };
 
 #endif // HITTABLELIST_H

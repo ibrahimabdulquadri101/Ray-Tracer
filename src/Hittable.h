@@ -3,9 +3,7 @@
 
 #include "Ray.h"
 #include "HitRecord.h"
-
-// Forward declaration — AABB will be defined in BVH.h
-class AABB;
+#include "AABB.h"
 
 class Hittable {
 public:
